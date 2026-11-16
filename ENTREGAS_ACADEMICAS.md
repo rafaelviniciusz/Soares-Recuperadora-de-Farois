@@ -205,6 +205,10 @@ Os casos abaixo estão preparados para execução manual. A coluna de resultado 
 que alguém execute o cenário no programa e registre a evidência; nenhum teste está marcado como
 aprovado sem execução.
 
+Em 16/11/2026, a tentativa de execução neste ambiente não pôde começar: os comandos `java` e
+`javac` não estão disponíveis. Isso não é um resultado de falha do programa; os casos continuam
+pendentes de execução em uma máquina com Java instalado.
+
 | ID | Rastreabilidade | Cenário / condição inicial | Resultado esperado | Resultado real / evidência |
 |---|---|---|---|---|
 | CT-01 | RF-01 / UC-03 | Cadastrar produto com dados válidos. | Produto incluído e disponível na listagem. | A preencher: resultado observado, data e captura ou anotação. |
