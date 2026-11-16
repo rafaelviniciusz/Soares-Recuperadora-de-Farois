@@ -94,37 +94,12 @@ versão a ser apresentada.
 
 ## Sprint 6 — persistência proposta
 
-O relatório propõe PostgreSQL e as entidades Categoria, Produto e Orçamento. O DDL abaixo é a
-proposta documentada; não foi executado e não há DAO/Repository Java no código original.
-
-```sql
-CREATE TABLE categoria (
-    id_categoria INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL UNIQUE,
-    descricao TEXT
-);
-
-CREATE TABLE produto (
-    id_produto INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nome VARCHAR(150) NOT NULL,
-    descricao TEXT,
-    preco NUMERIC(10, 2) CHECK (preco IS NULL OR preco >= 0),
-    quantidade INTEGER NOT NULL DEFAULT 0 CHECK (quantidade >= 0),
-    marca VARCHAR(100),
-    modelo VARCHAR(100),
-    id_categoria INTEGER NOT NULL,
-    CONSTRAINT fk_produto_categoria FOREIGN KEY (id_categoria)
-        REFERENCES categoria(id_categoria)
-        ON UPDATE CASCADE ON DELETE RESTRICT
-);
-
-CREATE TABLE orcamento (
-    id_orcamento INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    nome_cliente VARCHAR(150) NOT NULL,
-    email VARCHAR(150) NOT NULL,
-    mensagem TEXT NOT NULL
-);
-```
+O script PostgreSQL simples está em [banco_soares.sql](banco_soares.sql). Ele cria as tabelas
+Categoria, Produto e Orçamento, mantém no Produto os campos usados pelo código Java e inclui
+marca/modelo_ano, previstos nos requisitos do documento. A categoria vira uma chave estrangeira;
+a futura DAO deverá relacionar o texto informado no Java com o registro da tabela `categoria`.
+O script ainda precisa ser executado em um banco PostgreSQL. Não há conexão JDBC nem DAO no código
+Java atual.
 
 ### Responsabilidades previstas para DAO/Repository
 
