@@ -90,6 +90,7 @@ versão a ser apresentada.
 | RF-03 Buscar e filtrar | US-02 / UC-01 | `busca()` localiza pelo ID. | O requisito prevê nome, categoria, marca e modelo/ano; o código não oferece esses filtros. |
 | RF-04 Atualizar estoque | US-03 / UC-04 | `atualizarEstoque()` aplica ajuste e recusa quantidade negativa. | Registrar ajuste positivo, negativo válido e negativo inválido. |
 | RF-05 Validar dados | US-01 / US-03 | Valida ID positivo/único, preço não negativo e quantidade não negativa. | Campos de texto podem ficar vazios; documentar se isso será aceito nesta versão. |
+| Edição e exclusão | UC-05 / UC-06 | `editarProduto()` e `excluirProduto()` existem no código. | Confirmar no documento de requisitos se serão requisitos formais e atribuir IDs antes da entrega. |
 
 ## Sprint 6 — persistência proposta
 
@@ -125,9 +126,19 @@ CREATE TABLE orcamento (
 );
 ```
 
-O DAO/Repository descrito no relatório deverá, quando essa etapa for autorizada, atender cadastro,
-listagem, busca, atualização, estoque e exclusão de produtos, além de categorias e orçamentos.
-No estado atual, isso é planejamento, não funcionalidade disponível.
+### Responsabilidades previstas para DAO/Repository
+
+| Entidade | Operações previstas na camada de persistência |
+|---|---|
+| Categoria | Cadastrar, listar e buscar categoria; verificar uso por produtos antes de exclusão. |
+| Produto | Cadastrar, listar, buscar por ID e filtros, editar, atualizar estoque e excluir. |
+| Orçamento | Cadastrar e consultar solicitações de orçamento. |
+
+Essas operações são um contrato acadêmico proposto para quando a equipe implementar persistência.
+O documento não define assinaturas Java nem afirma que exista conexão JDBC. O modelo usa categoria
+relacionada por chave estrangeira e inclui orçamento; o objeto `Produto` do código atual guarda a
+categoria como texto e não possui marca/modelo, portanto a equipe precisa validar o mapeamento antes
+de implementar essa camada.
 
 ## Sprint 7 — diagramas do código atual
 
@@ -188,22 +199,27 @@ sequenceDiagram
 
 Esses diagramas representam o programa atual, não uma arquitetura em camadas que ainda não existe.
 
-## Sprint 8 — roteiro de testes, sem execução registrada
+## Sprint 8 — roteiro e registro de testes
 
-| ID | Cenário | Resultado esperado |
-|---|---|---|
-| CT-01 | Cadastrar produto com dados válidos | Produto incluído e disponível na listagem. |
-| CT-02 | Informar ID zero ou repetido | Solicitar outro ID; não duplicar produto. |
-| CT-03 | Informar preço ou quantidade negativa | Solicitar novo valor; não concluir cadastro/edição inválida. |
-| CT-04 | Listar vetor vazio | Exibir “Nenhum produto cadastrado”. |
-| CT-05 | Buscar ID existente e inexistente | Mostrar o produto ou “Produto não encontrado”. |
-| CT-06 | Ajustar estoque para cima/baixo | Atualizar e mostrar saldo. |
-| CT-07 | Ajustar estoque abaixo de zero | Recusar ajuste e manter quantidade anterior. |
-| CT-08 | Editar e excluir produto | Refletir a edição ou remoção na listagem. |
-| CT-09 | Digitar texto em opção numérica | Não encerrar o programa; exibir opção inválida. |
+Os casos abaixo estão preparados para execução manual. A coluna de resultado real fica em branco até
+que alguém execute o cenário no programa e registre a evidência; nenhum teste está marcado como
+aprovado sem execução.
+
+| ID | Rastreabilidade | Cenário / condição inicial | Resultado esperado | Resultado real / evidência |
+|---|---|---|---|---|
+| CT-01 | RF-01 / UC-03 | Cadastrar produto com dados válidos. | Produto incluído e disponível na listagem. | A preencher: resultado observado, data e captura ou anotação. |
+| CT-02 | RF-01, RF-05 / UC-03 | Informar ID zero ou repetido durante cadastro. | Solicitar outro ID; não duplicar produto. | A preencher: resultado observado, data e captura ou anotação. |
+| CT-03 | RF-01, RF-05 / UC-03 | Informar preço ou quantidade negativa no cadastro. | Solicitar novo valor; não concluir cadastro com valor inválido. | A preencher: resultado observado, data e captura ou anotação. |
+| CT-04 | RF-02 / UC-02 | Listar com vetor vazio. | Exibir “Nenhum produto cadastrado”. | A preencher: resultado observado, data e captura ou anotação. |
+| CT-05 | RF-03 / UC-01 | Buscar um ID existente e depois um inexistente. | Mostrar o produto ou “Produto não encontrado”. | A preencher: resultado observado, data e captura ou anotação. |
+| CT-06 | RF-04 / UC-04 | Fazer ajuste positivo e ajuste negativo que mantenha saldo não negativo. | Atualizar e mostrar o novo saldo. | A preencher: resultado observado, data e captura ou anotação. |
+| CT-07 | RF-04 / UC-04 | Tentar ajustar estoque para valor abaixo de zero. | Recusar o ajuste e manter a quantidade anterior. | A preencher: resultado observado, data e captura ou anotação. |
+| CT-08 | Requisito formal a confirmar / UC-05, UC-06 | Editar um produto e excluir outro. | Refletir as alterações na listagem. | A preencher: resultado observado, data e captura ou anotação. |
+| CT-09 | Entrada de menu | Digitar texto em uma opção numérica do menu principal e do administrativo. | Manter o programa aberto e exibir “Opcao invalida!”. | A preencher: resultado observado, data e captura ou anotação. |
 
 Este roteiro pode ser executado manualmente sobre o Java atual. JUnit e teste de integração com banco
-não estão presentes e dependem de uma decisão de escopo/arquitetura da equipe.
+não estão presentes. Como o programa atual concentra entrada, estado e operações numa classe com
+métodos estáticos, testes automatizados e integração exigem uma decisão de arquitetura da equipe.
 
 ## Sprint 9 — roteiro da apresentação final
 
