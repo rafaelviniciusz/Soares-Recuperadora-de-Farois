@@ -34,4 +34,3 @@ CREATE TABLE IF NOT EXISTS orcamento (
     email VARCHAR(150) NOT NULL,
     mensagem TEXT NOT NULL
 );
-

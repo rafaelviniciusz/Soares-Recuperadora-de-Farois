@@ -1,5 +1,10 @@
 import java.util.Arrays;
 import java.util.Scanner;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 public class RecuperadoraFarois {
    static class Produto { // classe equivalente à struct de um produto
        int id;
@@ -158,6 +163,10 @@ public class RecuperadoraFarois {
            vetor[quantidade].preco = lerFloat("Valor para preço invalido, digite novamente um valor valido: ");
        }
        vetor[quantidade].descricao = lerTexto("\nDigite a descricao do produto: ", 99);
+       if (!inserirProdutoBanco(vetor[quantidade])) {
+           vetor[quantidade] = null;
+           return;
+       }
        // aumenta a quantidade de produtos cadastrados
        quantidade++;
        System.out.println("\nProduto cadastrado com sucesso!\n");
@@ -219,11 +228,15 @@ public class RecuperadoraFarois {
                System.out.println("\nProduto: " + vetor[i].nome);
                System.out.println("Quantidade atual: " + vetor[i].quantidade);
                alteracao = lerInteiro("\nDigite a quantidade para alterar (+ ou -): ");
-               if (vetor[i].quantidade + alteracao < 0) {
+               if (!estoqueValido(vetor[i].quantidade, alteracao)) {
                    System.out.println("\nErro: estoque nao pode ficar negativo.\n");
                    return;
                }
-               vetor[i].quantidade += alteracao;
+               int novaQuantidade = vetor[i].quantidade + alteracao;
+               if (!atualizarQuantidadeBanco(vetor[i].id, novaQuantidade)) {
+                   return;
+               }
+               vetor[i].quantidade = novaQuantidade;
                System.out.println("\nEstoque atualizado com sucesso!");
                System.out.println("Nova quantidade: " + vetor[i].quantidade + "\n");
                return;
@@ -233,11 +246,13 @@ public class RecuperadoraFarois {
            System.out.println("\nProduto nao encontrado.\n");
        }
    }
+   static boolean estoqueValido(int atual, int alteracao) {
+       return atual + alteracao >= 0;
+   }
    //==========funcao de editar produto buscando percorrendo vetor e atualizando o ponteiro, com validação de id==========
    static void editarProduto() {
        int idBusca;
        int i;
-       int encontrado = 0;
        if (vetor == null || quantidade == 0) {
            System.out.println("\nNenhum produto cadastrado.\n");
            return;
@@ -245,10 +260,10 @@ public class RecuperadoraFarois {
        idBusca = lerInteiro("\nDigite o ID do produto que deseja editar: ");
        for (i = 0; i < quantidade; i++) {
            if (vetor[i].id == idBusca) {
+               Produto produtoEditado = new Produto();
                int novoId;
                int idExiste;
                int j;
-               encontrado = 1;
                System.out.println("\nProduto encontrado!\n");
                do {
                    idExiste = 0;
@@ -265,25 +280,27 @@ public class RecuperadoraFarois {
                        }
                    }
                } while (novoId <= 0 || idExiste == 1);
-               vetor[i].id = novoId;
-               vetor[i].nome = lerTexto("\nNovo nome: ", 99);
-               vetor[i].categoria = lerTexto("\nNova categoria: ", 39);
-               vetor[i].preco = lerFloat("\nNovo preco: ");
-               while (vetor[i].preco < 0) {
-                   vetor[i].preco = lerFloat("\nPreco invalido. Digite novamente: ");
+               produtoEditado.id = novoId;
+               produtoEditado.nome = lerTexto("\nNovo nome: ", 99);
+               produtoEditado.categoria = lerTexto("\nNova categoria: ", 39);
+               produtoEditado.preco = lerFloat("\nNovo preco: ");
+               while (produtoEditado.preco < 0) {
+                   produtoEditado.preco = lerFloat("\nPreco invalido. Digite novamente: ");
                }
-               vetor[i].quantidade = lerInteiro("\nNova quantidade: ");
-               while (vetor[i].quantidade < 0) {
-                   vetor[i].quantidade = lerInteiro("\nQuantidade invalida. Digite novamente: ");
+               produtoEditado.quantidade = lerInteiro("\nNova quantidade: ");
+               while (produtoEditado.quantidade < 0) {
+                   produtoEditado.quantidade = lerInteiro("\nQuantidade invalida. Digite novamente: ");
                }
-               vetor[i].descricao = lerTexto("\nNova descricao: ", 99);
+               produtoEditado.descricao = lerTexto("\nNova descricao: ", 99);
+               if (!atualizarProdutoBanco(produtoEditado, idBusca)) {
+                   return;
+               }
+               vetor[i] = produtoEditado;
                System.out.println("\nProduto editado com sucesso!\n");
                return;
            }
        }
-       if (encontrado == 0) {
-           System.out.println("\nProduto nao encontrado.\n");
-       }
+       System.out.println("\nProduto nao encontrado.\n");
    }
    //==========funcao de excluir produto percorrendo vetor e excluindo movendo para esquerda==========
    static void excluirProduto() {
@@ -298,6 +315,9 @@ public class RecuperadoraFarois {
        idBusca = lerInteiro("\nDigite o ID do produto que deseja excluir: ");
        for (i = 0; i < quantidade; i++) {
            if (vetor[i].id == idBusca) {
+               if (!excluirProdutoBanco(vetor[i].id)) {
+                   return;
+               }
                encontrado = 1;
                System.out.printf("\nProduto %s (ID %d) excluido com sucesso!%n", vetor[i].nome, vetor[i].id);
                // desloca os produtos para a esquerda
@@ -325,10 +345,152 @@ public class RecuperadoraFarois {
        System.out.println("\n===== SOBRE A EMPRESA =====");
        System.out.println("A Soares Recuperadora de Farois atua na recuperacao restauracao e polimento de farois automotivos oferecendo servicos de qualidade para seus clientes");
    }
+   //==========persistencia no banco de dados==========
+   static Connection abrirConexaoBanco() throws SQLException {
+       String usuario = System.getenv("PGUSER");
+       String senha = System.getenv("PGPASSWORD");
+       if (usuario == null || senha == null) {
+           throw new SQLException("Configure PGUSER e PGPASSWORD no terminal.");
+       }
+       return DriverManager.getConnection(
+           "jdbc:postgresql://localhost:5432/soares_recuperadora", usuario, senha);
+   }
+
+   static int obterIdCategoria(Connection conexao, String nome) throws SQLException {
+       String inserir = "INSERT INTO categoria (nome) VALUES (?) ON CONFLICT (nome) DO NOTHING";
+       try (PreparedStatement comando = conexao.prepareStatement(inserir)) {
+           comando.setString(1, nome);
+           comando.executeUpdate();
+       }
+       String consultar = "SELECT id_categoria FROM categoria WHERE nome = ?";
+       try (PreparedStatement comando = conexao.prepareStatement(consultar)) {
+           comando.setString(1, nome);
+           try (ResultSet resultado = comando.executeQuery()) {
+               if (resultado.next()) {
+                   return resultado.getInt("id_categoria");
+               }
+           }
+       }
+       throw new SQLException("Nao foi possivel localizar a categoria: " + nome);
+   }
+
+   static void carregarProdutosBanco() {
+       String consulta = "SELECT p.id_produto, p.nome, c.nome AS categoria, p.preco, "
+           + "p.quantidade, p.descricao FROM produto p "
+           + "JOIN categoria c ON c.id_categoria = p.id_categoria ORDER BY p.id_produto";
+       try (Connection conexao = abrirConexaoBanco();
+            PreparedStatement comando = conexao.prepareStatement(consulta);
+            ResultSet resultado = comando.executeQuery()) {
+           Produto[] produtos = new Produto[10];
+           int total = 0;
+           while (resultado.next()) {
+               if (total == produtos.length) {
+                   produtos = Arrays.copyOf(produtos, produtos.length * 2);
+               }
+               Produto produto = new Produto();
+               produto.id = resultado.getInt("id_produto");
+               produto.nome = resultado.getString("nome");
+               produto.categoria = resultado.getString("categoria");
+               produto.preco = resultado.getFloat("preco");
+               produto.quantidade = resultado.getInt("quantidade");
+               produto.descricao = resultado.getString("descricao");
+               produtos[total++] = produto;
+           }
+           quantidade = total;
+           capacidade = produtos.length;
+           vetor = produtos;
+           if (total == 0) {
+               quantidade = 0;
+           }
+       } catch (SQLException e) {
+           System.out.println("Nao foi possivel carregar os produtos: " + e.getMessage());
+       }
+   }
+
+   static boolean inserirProdutoBanco(Produto produto) {
+       String inserir = "INSERT INTO produto (id_produto, nome, id_categoria, preco, quantidade, descricao) "
+           + "VALUES (?, ?, ?, ?, ?, ?)";
+       try (Connection conexao = abrirConexaoBanco()) {
+           int idCategoria = obterIdCategoria(conexao, produto.categoria);
+           try (PreparedStatement comando = conexao.prepareStatement(inserir)) {
+               comando.setInt(1, produto.id);
+               comando.setString(2, produto.nome);
+               comando.setInt(3, idCategoria);
+               comando.setFloat(4, produto.preco);
+               comando.setInt(5, produto.quantidade);
+               comando.setString(6, produto.descricao);
+               return comando.executeUpdate() == 1;
+           }
+       } catch (SQLException e) {
+           System.out.println("Nao foi possivel salvar o produto no banco: " + e.getMessage());
+           return false;
+       }
+   }
+
+   static boolean atualizarProdutoBanco(Produto produto, int idOriginal) {
+       String atualizar = "UPDATE produto SET id_produto = ?, nome = ?, id_categoria = ?, preco = ?, "
+           + "quantidade = ?, descricao = ? WHERE id_produto = ?";
+       try (Connection conexao = abrirConexaoBanco()) {
+           int idCategoria = obterIdCategoria(conexao, produto.categoria);
+           try (PreparedStatement comando = conexao.prepareStatement(atualizar)) {
+               comando.setInt(1, produto.id);
+               comando.setString(2, produto.nome);
+               comando.setInt(3, idCategoria);
+               comando.setFloat(4, produto.preco);
+               comando.setInt(5, produto.quantidade);
+               comando.setString(6, produto.descricao);
+               comando.setInt(7, idOriginal);
+               return comando.executeUpdate() == 1;
+           }
+       } catch (SQLException e) {
+           System.out.println("Nao foi possivel atualizar o produto no banco: " + e.getMessage());
+           return false;
+       }
+   }
+
+   static boolean atualizarQuantidadeBanco(int id, int quantidadeNova) {
+       String atualizar = "UPDATE produto SET quantidade = ? WHERE id_produto = ?";
+       try (Connection conexao = abrirConexaoBanco();
+            PreparedStatement comando = conexao.prepareStatement(atualizar)) {
+           comando.setInt(1, quantidadeNova);
+           comando.setInt(2, id);
+           return comando.executeUpdate() == 1;
+       } catch (SQLException e) {
+           System.out.println("Nao foi possivel atualizar o estoque no banco: " + e.getMessage());
+           return false;
+       }
+   }
+
+   static boolean excluirProdutoBanco(int id) {
+       String excluir = "DELETE FROM produto WHERE id_produto = ?";
+       try (Connection conexao = abrirConexaoBanco();
+            PreparedStatement comando = conexao.prepareStatement(excluir)) {
+           comando.setInt(1, id);
+           return comando.executeUpdate() == 1;
+       } catch (SQLException e) {
+           System.out.println("Nao foi possivel excluir o produto do banco: " + e.getMessage());
+           return false;
+       }
+   }
+
+   static boolean testarConexaoBanco() {
+       try (Connection conexao = abrirConexaoBanco()) {
+           System.out.println("Conexao com o banco realizada com sucesso!");
+           return true;
+       } catch (SQLException e) {
+           System.out.println("Falha na conexao com o banco: " + e.getMessage());
+           return false;
+       }
+   }
    //=============================main================================
    public static void main(String[] args) {
        int opcao;
        System.out.println("Bem vindo a Soares Recuperadora De Farois!\n");
+       if (!testarConexaoBanco()) {
+           System.out.println("Programa encerrado porque o banco de dados nao esta disponivel.");
+           return;
+       }
+       carregarProdutosBanco();
        do {
            System.out.println("\n=================================");
            System.out.println("SOARES RECUPERADORA DE FAROIS");
